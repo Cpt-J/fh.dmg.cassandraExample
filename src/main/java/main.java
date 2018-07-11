@@ -6,7 +6,9 @@ import java.util.List;
 
 public class main {
     public static void main(String[] args) throws InterruptedException {
-        //starting cassandra: 'docker run --name container-name -p localport:9042 cassandra:latest'
+        //starting cassandra: 'docker run --name container-name -p localport:9042 -d cassandra:latest'
+        // get ip: 'docker inspect -f '{{.NetworkSettings.IPAddress}}' container-name'
+        //docker run -e CASSANDRA_SEEDS="$('docker inspect -f '{{.NetworkSettings.IPAddress}}' container-name)" -d --name ...
         //add node to cluster: 'docker run --name another-container-name -d --link container-name:cassandra cassandra:latest
         int replicationfactor = 1;
         String keyspace = "kspace";

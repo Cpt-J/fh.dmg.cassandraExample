@@ -3,37 +3,103 @@ import com.datastax.driver.core.Session;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class main {
+
+   static int replicationfactor = 1;
+    static String keyspace = "kspace";
+    static String[][] tabellen = {
+            {"personen", "id int primary key, vorname text, name text, age int, adresseId int"},
+            {"adressen", "id int primary key, strasse text, nr int, zusatz text, stadtId int"},
+            {"staedte", "id int primary key, ort text"}
+    };
+   static  CassandraConnector client;
     public static void main(String[] args) throws InterruptedException {
         //starting cassandra: 'docker run --name container-name -p localport:9042 -d cassandra:latest'
         // get ip: 'docker inspect -f '{{.NetworkSettings.IPAddress}}' container-name'
         //docker run -e CASSANDRA_SEEDS="$('docker inspect -f '{{.NetworkSettings.IPAddress}}' container-name)" -d --name ...
         //add node to cluster: 'docker run --name another-container-name -d --link container-name:cassandra cassandra:latest
-        int replicationfactor = 1;
-        String keyspace = "kspace";
-        String[][] tabellen = {
-                {"personen", "id int primary key, vorname text, name text, age int, adresseId int"},
-                {"adressen", "id int primary key, strasse text, nr int, zusatz text, stadtId int"},
-                {"staedte", "id int primary key, ort text"}
-        };
+
 
         //Verbindung aufbauen
-        CassandraConnector client = new CassandraConnector();
+        client = new CassandraConnector();
         client.connect("localhost" ,9042 );
-        Session session = client.getSession();
 
         //Keyspace erstellen
         client.createKeyspace(keyspace, "SimpleStrategy", replicationfactor);
         //Keyspace nutzen
         client.setKeyspace(keyspace);
 
+
+
+        Scanner in = new Scanner(System.in);
+        char c = 'a';
+        do {
+            System.out.println("1: Tabellen erstellen");
+            System.out.println("2: Datensätze einfügen");
+            System.out.println("3: Datensätze anzeigen");
+            System.out.println("4: Tabellen löschen");
+            System.out.println("q: beenden");
+            c = in.next().charAt(0);
+            switch (c){
+                case '1':
+                    createTable();
+                   break;
+                case '2':
+                    insertData();;
+                    break;
+                case '3':
+                    showData();
+                    break;
+                case '4':
+                    removeTables();
+                    break;
+            }
+        }while(c != 'q');
+
+        in.close();
+
+
+        //verbindung abbauen
+        client.close();
+
+
+    }
+
+    public static void removeTables(){
+        //Tabellen löschen
+        for(String[] s :tabellen){
+            client.deleteTable(s[0]);
+        }
+    }
+
+    public static void showData(){
+        //Select statements
+        String selectQuery = "Select %s from %s.%s"; //column, keyspace, table
+        List<String> selects = new ArrayList<>();
+        selects.add(String.format(selectQuery, "*", keyspace, "personen"));
+        selects.add(String.format(selectQuery, "*", keyspace, "adressen"));
+        selects.add(String.format(selectQuery, "*", keyspace, "staedte"));
+
+        for(String s : selects){
+            ResultSet res = client.getSession().execute(s);
+            System.out.println(res.getColumnDefinitions().toString());
+            res.all().stream().forEach(e -> System.out.println(e.toString()));
+            System.out.println();
+        }
+    }
+
+    public static void createTable(){
         //Tabellen erstellen
         for(String[] s :tabellen){
             client.createTable(s[0], s[1]);
         }
+    }
+    public static void createKeyspace(){
 
-
+    }
+    public static void insertData(){
         //Data einfügen
         final String insertQuery = "Insert into %s.%s (%s) values(%s);";
         List<String> inserts = new ArrayList<>();
@@ -51,40 +117,8 @@ public class main {
         inserts.add(String.format(insertQuery, keyspace, table, "id, ort", "1, 'Hamburg'"));
 
         for(String query: inserts ){
-            session.execute(query);
+            client.getSession().execute(query);
         }
-
-
-
-        //Select statements
-        String selectQuery = "Select %s from %s.%s"; //column, keyspace, table
-        List<String> selects = new ArrayList<>();
-        selects.add(String.format(selectQuery, "*", keyspace, "personen"));
-        selects.add(String.format(selectQuery, "*", keyspace, "adressen"));
-        selects.add(String.format(selectQuery, "*", keyspace, "staedte"));
-
-        for(String s : selects){
-            ResultSet res = session.execute(s);
-            System.out.println(res.getColumnDefinitions().toString());
-            res.all().stream().forEach(e -> System.out.println(e.toString()));
-            System.out.println();
-        }
-
-
-
-        Thread.sleep(120000);
-        //Tabellen löschen
-        for(String[] s :tabellen){
-            client.deleteTable(s[0]);
-        }
-
-        //Keyspace löschen
-        client.deleteKeyspace(keyspace);
-
-
-        //verbindung abbauen
-        client.close();
-
-
     }
+
 }
